@@ -1,8 +1,9 @@
-// 21_Texture
-//      Mouse: Arcball manipulation
-//      Keyboard: 'r' - reset arcball
+// MultiTexture
+//   Mouse left button: Arcball manipulation
+//   Keyboard: 'r': reset arcball
+//             'esc': quit 
 
-#include <GL/glew.h> 
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -13,10 +14,9 @@
 #include <shader.h>
 #include <cube.h>
 #include <arcball.h>
-
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
- 
+
 
 using namespace std;
 
@@ -45,7 +45,7 @@ float arcballSpeed = 0.3f;
 static Arcball modelArcBall(SCR_WIDTH, SCR_HEIGHT, arcballSpeed, true, true);
 
 // for texture
-static unsigned int texture; // Array of texture ids.
+static unsigned int texture1, texture2; // Array of texture ids.
 
 
 int main()
@@ -56,11 +56,11 @@ int main()
     globalShader = new Shader("global.vs", "global.fs");
     
     // projection and view matrix
-    globalShader->use();
     projection = glm::perspective(glm::radians(45.0f),
                                   (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    globalShader->setMat4("projection", projection);
     view = glm::lookAt(camPosition, camTarget, camUp);
+    globalShader->use();
+    globalShader->setMat4("projection", projection);
     globalShader->setMat4("view", view);
     
     // load texture
@@ -94,7 +94,7 @@ GLFWwindow *glAllInit()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     
     // glfw window creation
-    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Texture 1", NULL, NULL);
+    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Multi Texture", NULL, NULL);
     if (window == NULL) {
         cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -124,22 +124,18 @@ GLFWwindow *glAllInit()
 
 void loadTexture() {
     
-    // Create texture ids.
-    glGenTextures(1, &texture);
-    
-    // All upcomming GL_TEXTURE_2D operations now on "texture" object
-    glBindTexture(GL_TEXTURE_2D, texture);
-    
-    // Set texture parameters for wrapping.
-    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+    // Loading Texture1
+    glGenTextures(1, &texture1);
+    glBindTexture(GL_TEXTURE_2D, texture1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    
-    // Set texture parameters for filtering.
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     
     int width, height, nrChannels;
+    
+    stbi_set_flip_vertically_on_load(true);   // vertical flip the texture
+    
     unsigned char *image = stbi_load("container.bmp", &width, &height, &nrChannels, 0);
     if (!image) {
         printf("texture %s loading error ... \n", "container.bmp");
@@ -151,9 +147,36 @@ void loadTexture() {
     else if (nrChannels == 3) format = GL_RGB;
     else if (nrChannels == 4) format = GL_RGBA;
     
-    glBindTexture( GL_TEXTURE_2D, texture );
+    glBindTexture( GL_TEXTURE_2D, texture1 );
     glTexImage2D( GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, image );
     glGenerateMipmap(GL_TEXTURE_2D);
+    
+    // Loading Texture2
+    glGenTextures(1, &texture2);
+    glBindTexture(GL_TEXTURE_2D, texture2);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    image = stbi_load("awesomeface.bmp", &width, &height, &nrChannels, 0);
+    if (!image) {
+        printf("texture %s loading error ... \n", "awesomeface.bmp");
+    }
+    else printf("texture %s loaded\n", "awesomeface.bmp");
+    
+    if (nrChannels == 1) format = GL_RED;
+    else if (nrChannels == 3) format = GL_RGB;
+    else if (nrChannels == 4) format = GL_RGBA;
+    
+    glBindTexture( GL_TEXTURE_2D, texture2 );
+    glTexImage2D( GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, image );
+    glGenerateMipmap(GL_TEXTURE_2D);
+    
+    // Setting texture
+    globalShader->use();
+    globalShader->setInt("texture1", 0);
+    globalShader->setInt("texture2", 1);
     
 }
 
@@ -166,7 +189,11 @@ void render() {
     globalShader->use();
     globalShader->setMat4("model", model);
     
-    glBindTexture(GL_TEXTURE_2D, texture);
+    // bind textures on corresponding texture units
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture1);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texture2);
     
     cube->draw(globalShader);
     
